@@ -1,0 +1,56 @@
+name: CD - Deploy pe GitHub Pages
+
+# Se declanșează după ce workflow-ul CI se finalizează cu succes pe main
+on:
+  workflow_run:
+    workflows: ["CI - Build & Test"]
+    types: [completed]
+    branches: [main]
+
+# Permisiuni necesare pentru GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# O singură rulare de deploy simultan (evită race conditions)
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publică pe GitHub Pages
+    runs-on: ubuntu-latest
+    # Rulează DOAR dacă CI a trecut cu succes
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout cod sursă
+        uses: actions/checkout@v4
+
+      - name: Configurează GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Încarcă directorul app/ ca artefact Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/
+
+      - name: Publică pe GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Raport deploy
+        run: |
+          echo "## 🚀 Deploy reușit - $(date '+%Y-%m-%d %H:%M UTC')" \
+            >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Aplicația este disponibilă la:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **${{ steps.deployment.outputs.page_url }}**" \
+            >> $GITHUB_STEP_SUMMARY
